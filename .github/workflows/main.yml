@@ -11,7 +11,7 @@ jobs:
 
     steps:
       # Step 1: Checkout repository
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       # Step 2: Set up Node.js
@@ -24,26 +24,21 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # Step 4: Build project
+      # Step 4: Build the project
       - name: Build project
         run: npm run build
 
-      # Step 5: Debug and verify dist folder exists
-      - name: Verify dist folder
+      # Step 5: Debug build folder exists on runner
+      - name: Verify dist folder on runner
         run: |
           echo "Current directory:"
           pwd
-          echo "Root files:"
+          echo "List files:"
           ls -la
-          if [ -d "dist" ]; then
-            echo "dist folder exists!"
-            ls -la dist
-          else
-            echo "Error: dist folder not found!"
-            exit 1
-          fi
+          echo "List dist folder:"
+          ls -la dist
 
-      # Step 6: Copy dist folder to Apache server
+      # Step 6: Copy files from runner -> server
       - name: Copy dist to server
         uses: appleboy/scp-action@v0.1.0
         with:
@@ -53,25 +48,14 @@ jobs:
           source: "dist/*"
           target: "/var/www/html/"
 
-      # Step 7: Backup old website, fix permissions, restart Apache
-      - name: Backup old website & restart Apache
+      # Step 7: Fix permissions & restart Apache
+      - name: Fix permissions & restart Apache
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
-            # Backup current website
-            if [ -d /var/www/html ]; then
-              sudo mv /var/www/html /var/www/html_backup_$(date +%Y%m%d_%H%M%S)
-            fi
-
-            # Create fresh document root
-            sudo mkdir -p /var/www/html
-
-            # Fix permissions
             sudo chown -R www-data:www-data /var/www/html
             sudo chmod -R 755 /var/www/html
-
-            # Restart Apache
             sudo systemctl restart apache2
