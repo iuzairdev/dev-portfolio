@@ -24,13 +24,17 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # Step 4: Build project with Vite
+      # Step 4: Build project
       - name: Build project
         run: npm run build
 
-      # Step 5: Verify dist folder
-      - name: Check dist folder
+      # Step 5: Debug and verify dist folder exists
+      - name: Verify dist folder
         run: |
+          echo "Current directory:"
+          pwd
+          echo "Root files:"
+          ls -la
           if [ -d "dist" ]; then
             echo "dist folder exists!"
             ls -la dist
@@ -39,7 +43,7 @@ jobs:
             exit 1
           fi
 
-      # Step 6: Copy dist to Apache
+      # Step 6: Copy dist folder to Apache server
       - name: Copy dist to server
         uses: appleboy/scp-action@v0.1.0
         with:
@@ -49,7 +53,7 @@ jobs:
           source: "dist/*"
           target: "/var/www/html/"
 
-      # Step 7: Backup old website, fix permissions & restart Apache
+      # Step 7: Backup old website, fix permissions, restart Apache
       - name: Backup old website & restart Apache
         uses: appleboy/ssh-action@v0.1.7
         with:
