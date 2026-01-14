@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout code
+      # Step 1: Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -20,25 +20,42 @@ jobs:
         with:
           node-version: '20'
 
-      # Step 3: Install dependencies
+      # Step 3: Install dependencies (legacy-peer-deps fixes npm conflicts)
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
       # Step 4: Build the app
-      - name: Build app
+      - name: Build project
         run: npm run build
 
-      # Step 5: Copy build files to server via SCP
-      - name: Copy build to server
+      # Step 5: Check which folder contains the built files
+      - name: Verify build folder
+        run: |
+          if [ -d "build" ]; then
+            echo "React build folder found: build/"
+            ls -la build
+          elif [ -d "dist" ]; then
+            echo "Vue/Angular build folder found: dist/"
+            ls -la dist
+          elif [ -d "out" ]; then
+            echo "Next.js exported folder found: out/"
+            ls -la out
+          else
+            echo "Error: No build folder found!"
+            exit 1
+          fi
+
+      # Step 6: Copy build files to server via SCP
+      - name: Deploy build to Apache server
         uses: appleboy/scp-action@v0.1.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
-          source: "build/*"
+          source: "build/*"   # <-- Change this if your build folder is dist/ or out/
           target: "/var/www/html/"
 
-      # Step 6: Set permissions & restart Apache
+      # Step 7: Backup old website, fix permissions, restart Apache
       - name: Fix permissions & restart Apache
         uses: appleboy/ssh-action@v0.1.7
         with:
@@ -46,6 +63,13 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
+            # Backup old website
+            sudo mv /var/www/html /var/www/html_backup_$(date +%Y%m%d_%H%M%S) || true
+            sudo mkdir -p /var/www/html
+
+            # Fix permissions
             sudo chown -R www-data:www-data /var/www/html
             sudo chmod -R 755 /var/www/html
+
+            # Restart Apache
             sudo systemctl restart apache2
