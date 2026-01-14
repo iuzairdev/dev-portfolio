@@ -1,4 +1,4 @@
-name: Build and Deploy Node.js Website
+name: Build and Deploy Node.js Vite Website
 
 on:
   push:
@@ -20,51 +20,49 @@ jobs:
         with:
           node-version: '20'
 
-      # Step 3: Install dependencies (legacy-peer-deps fixes npm conflicts)
+      # Step 3: Install dependencies
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # Step 4: Build the app
+      # Step 4: Build project with Vite
       - name: Build project
         run: npm run build
 
-      # Step 5: Check which folder contains the built files
-      - name: Verify build folder
+      # Step 5: Verify dist folder
+      - name: Check dist folder
         run: |
-          if [ -d "build" ]; then
-            echo "React build folder found: build/"
-            ls -la build
-          elif [ -d "dist" ]; then
-            echo "Vue/Angular build folder found: dist/"
+          if [ -d "dist" ]; then
+            echo "dist folder exists!"
             ls -la dist
-          elif [ -d "out" ]; then
-            echo "Next.js exported folder found: out/"
-            ls -la out
           else
-            echo "Error: No build folder found!"
+            echo "Error: dist folder not found!"
             exit 1
           fi
 
-      # Step 6: Copy build files to server via SCP
-      - name: Deploy build to Apache server
+      # Step 6: Copy dist to Apache
+      - name: Copy dist to server
         uses: appleboy/scp-action@v0.1.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
-          source: "build/*"   # <-- Change this if your build folder is dist/ or out/
+          source: "dist/*"
           target: "/var/www/html/"
 
-      # Step 7: Backup old website, fix permissions, restart Apache
-      - name: Fix permissions & restart Apache
+      # Step 7: Backup old website, fix permissions & restart Apache
+      - name: Backup old website & restart Apache
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
-            # Backup old website
-            sudo mv /var/www/html /var/www/html_backup_$(date +%Y%m%d_%H%M%S) || true
+            # Backup current website
+            if [ -d /var/www/html ]; then
+              sudo mv /var/www/html /var/www/html_backup_$(date +%Y%m%d_%H%M%S)
+            fi
+
+            # Create fresh document root
             sudo mkdir -p /var/www/html
 
             # Fix permissions
